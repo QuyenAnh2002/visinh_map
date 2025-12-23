@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bản đồ Tồn dư Kháng sinh (Amox & Oflo)</title>
+    
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    
+    <style>
+        body { margin: 0; padding: 0; }
+        #map { height: 100vh; width: 100%; background: #ffffff; }
+        
+        /* Style cho Popup */
+        .info-popup { font-family: 'Segoe UI', sans-serif; min-width: 240px; }
+        .info-popup h3 { 
+            margin: 0 0 10px 0; 
+            color: #2c3e50; 
+            border-bottom: 2px solid #3498db; 
+            font-size: 16px; 
+            padding-bottom: 5px;
+            font-weight: bold;
+        }
+        .info-row { margin-bottom: 6px; font-size: 14px; border-bottom: 1px dashed #eee; padding-bottom: 2px;}
+        .info-label { font-weight: bold; color: #555; display: inline-block; width: 90px;}
+        .coordinates { font-size: 11px; color: #999; font-style: italic; margin-top: 8px; text-align: right;}
+        .unit { font-size: 11px; color: #777; }
+        
+        /* Màu cho giá trị */
+        .val-high { color: #d32f2f; font-weight: bold; }
+        .val-med { color: #f57c00; font-weight: bold; }
+        .val-safe { color: #388e3c; }
+        .val-nodata { color: #999; font-style: italic;}
+    </style>
+</head>
+<body>
+
+    <div id="map"></div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+
+    <script>
+        // 1. Khởi tạo bản đồ
+        var map = L.map('map').setView([20.6, 106.0], 9); 
+
+        // 2. Bản đồ nền Tối giản
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png', {
+            attribution: '',
+            subdomains: 'abcd',
+            maxZoom: 19
+        }).addTo(map);
+
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png', {
+            subdomains: 'abcd',
+            maxZoom: 19,
+            pane: 'shadowPane' 
+        }).addTo(map);
+
+        // 3. TÔ MÀU VÙNG (Hà Nội, Hà Nam, Nam Định, Ninh Bình)
+        var targetProvinces = ["Thành phố Hà Nội", "Tỉnh Hà Nam", "Tỉnh Nam Định", "Tỉnh Ninh Bình"];
+        var geoJsonUrl = "https://raw.githubusercontent.com/daohoangson/vietnam-administrative-division-json/master/data.json";
+
+        $.getJSON(geoJsonUrl, function(data) {
+            L.geoJson(data, {
+                style: function(feature) {
+                    if (targetProvinces.includes(feature.properties.name)) {
+                        return {
+                            fillColor: "#9e9e9e", 
+                            weight: 1,
+                            opacity: 1,
+                            color: 'white',       
+                            fillOpacity: 0.3      
+                        };
+                    } else {
+                        return {
+                            fillColor: "#ffffff", 
+                            weight: 1,
+                            opacity: 1,
+                            color: '#e0e0e0',     
+                            fillOpacity: 0        
+                        };
+                    }
+                }
+            }).addTo(map);
+        });
+
+        // 4. DỮ LIỆU TỒN DƯ KHÁNG SINH (Đã xử lý làm tròn số)
+        var samplingPoints = [
+            // --- HÀ NỘI ---
+            { name: "HN1", lat: 21.002394, lng: 105.861617, amox: 11.23, oflo: 1.77, status: "high" },
+            { name: "HN2", lat: 20.979782, lng: 105.864387, amox: 16.25, oflo: null, status: "high" }, // #DIV/0! -> null
+            { name: "HN3", lat: 20.973038, lng: 105.852310, amox: 1.80, oflo: 0.63, status: "safe" },
+            { name: "HN4", lat: 21.136430, lng: 105.713542, amox: 1.69, oflo: 0.58, status: "safe" },
+            { name: "HN5", lat: 20.870492, lng: 105.828178, amox: 12.70, oflo: null, status: "high" },
+            { name: "HN6", lat: 20.972705, lng: 105.781089, amox: 12.14, oflo: null, status: "high" },
+            
+            // --- HÀ NAM ---
+            { name: "HNA", lat: 20.545997, lng: 106.171562, amox: 20.12, oflo: null, status: "high" },
+
+            // --- NINH BÌNH ---
+            { name: "NB1", lat: 20.270168, lng: 105.980985, amox: null, oflo: null, status: "nodata" }, // Cả 2 đều #DIV/0!
+            { name: "NB2", lat: 20.254874, lng: 106.041030, amox: 0.76, oflo: 0.10, status: "safe" },
+            { name: "NB3", lat: 20.224119, lng: 106.100343, amox: 8.46, oflo: 0.41, status: "medium" },
+
+            // --- KHU VỰC AO (Ninh Bình/Thanh Hóa?) ---
+            { name: "AO1", lat: 19.952500, lng: 106.092778, amox: 4.25, oflo: 1.88, status: "medium" },
+            { name: "AO2", lat: 19.950556, lng: 106.093333, amox: 12.04, oflo: -1, status: "high" }, // N.D. -> -1 để đánh dấu
+
+            // --- NAM ĐỊNH ---
+            { name: "NĐ1", lat: 20.274562, lng: 106.575639, amox: 7.16, oflo: 1.17, status: "medium" },
+            { name: "NĐ2", lat: 20.238269, lng: 106.586465, amox: 4.30, oflo: 1.91, status: "medium" }
+        ];
+
+        // Hàm chọn màu chấm tròn
+        function getColor(status) {
+            return status === 'high' ? '#d32f2f' :       // Đỏ (Cao)
+                   status === 'medium' ? '#f57c00' :     // Cam (TB)
+                   status === 'nodata' ? '#999' :        // Xám (Không có số liệu)
+                   '#388e3c';                            // Xanh (Thấp/An toàn)
+        }
+
+        // Hàm format giá trị hiển thị
+        function formatVal(val) {
+            if (val === null) return '<span class="val-nodata">Chưa xác định</span>';
+            if (val === -1) return '<span class="val-safe">Không phát hiện</span>';
+            // Tô màu số liệu
+            let colorClass = (val > 10) ? 'val-high' : (val > 2) ? 'val-med' : 'val-safe';
+            return `<span class="${colorClass}">${val}</span> <span class="unit">ng/L</span>`;
+        }
+
+        // Vẽ điểm
+        samplingPoints.forEach(function(point) {
+            var marker = L.circleMarker([point.lat, point.lng], {
+                radius: 8,
+                fillColor: getColor(point.status),
+                color: "#fff",
+                weight: 1.5,
+                opacity: 1,
+                fillOpacity: 0.9
+            }).addTo(map);
+
+            // Tạo nội dung Popup
+            var popupContent = `
+                <div class="info-popup">
+                    <h3>Điểm thu mẫu: ${point.name}</h3>
+                    <div class="info-row">
+                        <span class="info-label">Amoxicillin:</span> ${formatVal(point.amox)}
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Ofloxacin:</span> ${formatVal(point.oflo)}
+                    </div>
+                    <div class="coordinates">
+                        Lat: ${point.lat.toFixed(4)}, Lng: ${point.lng.toFixed(4)}
+                    </div>
+                </div>
+            `;
+            
+            marker.bindPopup(popupContent);
+        });
+        
+        // Thêm chú thích (Legend) góc phải dưới
+        var legend = L.control({position: 'bottomright'});
+        legend.onAdd = function (map) {
+            var div = L.DomUtil.create('div', 'info legend');
+            div.style.background = "white";
+            div.style.padding = "10px";
+            div.style.border = "1px solid #ccc";
+            div.innerHTML = `
+                <div style="font-weight:bold; margin-bottom:5px">Mức độ tồn dư</div>
+                <div><span style="background:#d32f2f; width:10px; height:10px; display:inline-block; border-radius:50%"></span> Cao (>10 ng/L)</div>
+                <div><span style="background:#f57c00; width:10px; height:10px; display:inline-block; border-radius:50%"></span> Trung bình</div>
+                <div><span style="background:#388e3c; width:10px; height:10px; display:inline-block; border-radius:50%"></span> Thấp / An toàn</div>
+                <div><span style="background:#999; width:10px; height:10px; display:inline-block; border-radius:50%"></span> Không có số liệu</div>
+            `;
+            return div;
+        };
+        legend.addTo(map);
+
+    </script>
+</body>
+</html>
