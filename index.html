@@ -3,37 +3,113 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bản đồ Tồn dư Kháng sinh (Amox & Oflo)</title>
+    <title>Bản đồ Dashboard ECET</title>
     
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     
     <style>
-        body { margin: 0; padding: 0; }
+        body { margin: 0; padding: 0; font-family: 'Segoe UI', sans-serif; overflow: hidden; }
         #map { height: 100vh; width: 100%; background: #ffffff; }
         
-        /* Style cho Popup */
-        .info-popup { font-family: 'Segoe UI', sans-serif; min-width: 240px; }
-        .info-popup h3 { 
-            margin: 0 0 10px 0; 
-            color: #2c3e50; 
-            border-bottom: 2px solid #3498db; 
-            font-size: 16px; 
-            padding-bottom: 5px;
-            font-weight: bold;
+        /* --- LOGO (Góc trái trên cho gọn) --- */
+        .logo-container {
+            position: absolute; top: 15px; left: 60px; z-index: 1000; /* Chuyển sang trái để nhường chỗ cho bảng */
+            background: rgba(255, 255, 255, 0.95); padding: 10px; border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2); text-align: center; max-width: 180px;
         }
-        .info-row { margin-bottom: 6px; font-size: 14px; border-bottom: 1px dashed #eee; padding-bottom: 2px;}
-        .info-label { font-weight: bold; color: #555; display: inline-block; width: 90px;}
-        .coordinates { font-size: 11px; color: #999; font-style: italic; margin-top: 8px; text-align: right;}
-        .unit { font-size: 11px; color: #777; }
+        .logo-img { width: 100%; height: auto; display: block; margin-bottom: 5px; }
+        .project-title { font-size: 11px; font-weight: bold; color: #004a99; text-transform: uppercase; }
+
+        /* --- DASHBOARD CỐ ĐỊNH (Thay thế Tooltip/Popup) --- */
+        .dashboard-panel {
+            position: fixed;
+            top: 50%;           /* Căn giữa theo chiều dọc */
+            right: 20px;        /* Cố định bên phải màn hình */
+            transform: translateY(-50%); /* Kỹ thuật căn giữa chính xác */
+            width: 360px;       /* Chiều rộng cố định */
+            max-height: 80vh;   /* Chiều cao tối đa 80% màn hình */
+            background: white;
+            z-index: 2000;      /* Nằm trên bản đồ */
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3); /* Đổ bóng sâu tạo chiều sâu */
+            border: 1px solid #e0e0e0;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+
+        /* Tiêu đề Dashboard */
+        .dash-header {
+            background: #00695c;
+            color: white;
+            padding: 15px;
+            text-align: center;
+        }
+        .dash-header h3 { margin: 0; font-size: 18px; font-weight: 700; }
+        .dash-coords { font-size: 11px; color: #b2dfdb; margin-top: 5px; font-style: italic; }
+
+        /* Nội dung Dashboard */
+        .dash-content {
+            padding: 15px;
+            overflow-y: auto; /* Cho phép cuộn nếu bảng dài */
+            flex-grow: 1;
+        }
+
+        /* Trạng thái chờ (khi chưa di chuột) */
+        .empty-state {
+            padding: 40px 20px;
+            text-align: center;
+            color: #777;
+            font-style: italic;
+        }
+        .empty-icon { font-size: 40px; margin-bottom: 10px; display: block; color: #ccc; }
+
+        /* --- Style cho Biểu đồ & Bảng (Giữ nguyên) --- */
+        .section-title { font-size: 12px; font-weight: bold; background: #f5f5f5; padding: 6px 10px; margin-top: 15px; border-left: 4px solid #009688; border-radius: 2px; color: #333; text-transform: uppercase; margin-bottom: 8px;}
         
-        /* Màu cho giá trị */
-        .val-high { color: #d32f2f; font-weight: bold; }
-        .val-med { color: #f57c00; font-weight: bold; }
-        .val-safe { color: #388e3c; }
-        .val-nodata { color: #999; font-style: italic;}
+        .antibiotic-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; background: #fff; padding: 5px;}
+        .ab-box { text-align: center; border: 1px solid #eee; padding: 8px; border-radius: 6px; }
+        .ab-name { font-size: 11px; color: #666; display: block; margin-bottom: 2px; }
+        .ab-val { font-size: 15px; font-weight: bold; }
+        
+        .val-high { color: #d32f2f; } .val-med { color: #f57c00; } .val-safe { color: #388e3c; } .val-nodata { color: #999; font-style: italic; font-size: 13px;}
+
+        .micro-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+        .micro-table th { text-align: left; color: #888; font-size: 10px; border-bottom: 1px solid #eee; padding-bottom: 5px;}
+        .micro-table td { padding: 8px 0; border-bottom: 1px dashed #f0f0f0; vertical-align: middle; }
+        .col-type { width: 25%; font-weight: 600; color: #333; font-size: 12px;}
+        
+        .bar-container { width: 100%; background: #e0e0e0; height: 10px; border-radius: 5px; position: relative; overflow: hidden;}
+        .bar-fill { height: 100%; background: linear-gradient(90deg, #009688, #4db6ac); border-radius: 5px; }
+        .bar-label { font-size: 10px; color: #555; margin-top: 3px; font-weight: 600;}
+
+        .pie-chart { width: 28px; height: 28px; border-radius: 50%; margin: 0 auto; border: 2px solid #fff; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        .pie-legend { font-size: 10px; color: #777; text-align: center; margin-top: 2px;}
+
+        .legend-note { font-size: 11px; margin-top: 15px; color: #666; background: #f9f9f9; padding: 10px; border-radius: 6px;}
+        .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 4px; margin-left: 8px;}
     </style>
 </head>
 <body>
+
+    <div class="logo-container">
+        <img src="logo.jpg" alt="Logo ECET" class="logo-img"> 
+        <div class="project-title">Quan trắc Môi trường<br>Tồn dư & Vi sinh</div>
+    </div>
+
+    <div id="dashboard" class="dashboard-panel">
+        <div class="dash-header">
+            <h3>Thông tin quan trắc</h3>
+            <div class="dash-coords">--</div>
+        </div>
+        <div class="dash-content">
+            <div class="empty-state">
+                <span class="empty-icon">👆</span>
+                Di chuyển chuột vào các điểm trên bản đồ để xem số liệu chi tiết tại đây.
+            </div>
+        </div>
+    </div>
 
     <div id="map"></div>
 
@@ -41,141 +117,269 @@
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 
     <script>
-        // 1. Khởi tạo bản đồ
-        var map = L.map('map').setView([20.6, 106.0], 9); 
+        // Zoom mặc định lùi ra một chút để thấy rõ bố cục
+        var map = L.map('map', {zoomControl: false}).setView([20.4, 105.8], 9); 
+        L.control.zoom({position: 'bottomleft'}).addTo(map); // Chuyển nút zoom xuống góc trái
 
-        // 2. Bản đồ nền Tối giản
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png', {
-            attribution: '',
-            subdomains: 'abcd',
-            maxZoom: 19
-        }).addTo(map);
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png', { subdomains: 'abcd', maxZoom: 19 }).addTo(map);
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png', { subdomains: 'abcd', maxZoom: 19, pane: 'shadowPane' }).addTo(map);
 
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png', {
-            subdomains: 'abcd',
-            maxZoom: 19,
-            pane: 'shadowPane' 
-        }).addTo(map);
-
-        // 3. TÔ MÀU VÙNG (Hà Nội, Hà Nam, Nam Định, Ninh Bình)
         var targetProvinces = ["Thành phố Hà Nội", "Tỉnh Hà Nam", "Tỉnh Nam Định", "Tỉnh Ninh Bình"];
-        var geoJsonUrl = "https://raw.githubusercontent.com/daohoangson/vietnam-administrative-division-json/master/data.json";
-
-        $.getJSON(geoJsonUrl, function(data) {
+        $.getJSON("https://raw.githubusercontent.com/daohoangson/vietnam-administrative-division-json/master/data.json", function(data) {
             L.geoJson(data, {
                 style: function(feature) {
-                    if (targetProvinces.includes(feature.properties.name)) {
-                        return {
-                            fillColor: "#9e9e9e", 
-                            weight: 1,
-                            opacity: 1,
-                            color: 'white',       
-                            fillOpacity: 0.3      
-                        };
-                    } else {
-                        return {
-                            fillColor: "#ffffff", 
-                            weight: 1,
-                            opacity: 1,
-                            color: '#e0e0e0',     
-                            fillOpacity: 0        
-                        };
-                    }
+                    return targetProvinces.includes(feature.properties.name) 
+                        ? { fillColor: "#9e9e9e", weight: 1, opacity: 1, color: 'white', fillOpacity: 0.2 }
+                        : { fillColor: "#ffffff", weight: 1, opacity: 1, color: '#e0e0e0', fillOpacity: 0 };
                 }
             }).addTo(map);
         });
 
-        // 4. DỮ LIỆU TỒN DƯ KHÁNG SINH (Đã xử lý làm tròn số)
-        var samplingPoints = [
-            // --- HÀ NỘI ---
-            { name: "HN1", lat: 21.002394, lng: 105.861617, amox: 11.23, oflo: 1.77, status: "high" },
-            { name: "HN2", lat: 20.979782, lng: 105.864387, amox: 16.25, oflo: null, status: "high" }, // #DIV/0! -> null
-            { name: "HN3", lat: 20.973038, lng: 105.852310, amox: 1.80, oflo: 0.63, status: "safe" },
-            { name: "HN4", lat: 21.136430, lng: 105.713542, amox: 1.69, oflo: 0.58, status: "safe" },
-            { name: "HN5", lat: 20.870492, lng: 105.828178, amox: 12.70, oflo: null, status: "high" },
-            { name: "HN6", lat: 20.972705, lng: 105.781089, amox: 12.14, oflo: null, status: "high" },
+        // --- HÀM XỬ LÝ (Giữ nguyên logic) ---
+        function getBarWidth(valStr) {
+            if(!valStr) return 0;
+            let num = parseFloat(valStr.toString().replace(/\./g, "").replace(",", "."));
+            if (isNaN(num) || num <= 0) return 0;
+            let logVal = Math.log10(num);
+            let percent = (logVal / 7) * 100; 
+            return percent > 100 ? 100 : (percent < 5 ? 5 : percent);
+        }
+
+        function getPieStyle(sal, pse) {
+            let s = sal || 0; let p = pse || 0; let total = s + p;
+            if (total === 0) return "background: #eee;";
+            let salPercent = (s / total) * 100;
+            return `background: conic-gradient(#ff9800 0% ${salPercent}%, #2196f3 ${salPercent}% 100%);`;
+        }
+
+        function formatAb(val) {
+            if (val === null || val === undefined) return '<span class="val-nodata">--</span>';
+            if (val === -1) return '<span class="val-safe">KPH</span>';
+            let color = (val > 10) ? 'val-high' : 'val-med';
+            return `<div class="ab-val ${color}">${val}</div><div style="font-size:10px; color:#999">ng/L</div>`;
+        }
+
+        // --- DỮ LIỆU ---
+        var mapData = {
+            "HNA": {
+                lat: 20.545997, lng: 106.171562, amox: 20.12, oflo: null,
+                samples: [
+                    { t: "Nước", cfu: "2.826", sal: 2, pse: 3 },
+                    { t: "VN Nước", cfu: "26.645", sal: 3, pse: 34 },
+                    { t: "Bùn", cfu: "188.708", sal: 0, pse: 3 },
+                    { t: "VN Bùn", cfu: "5.870", sal: 1, pse: 3 },
+                    { t: "SOM", cfu: "92.836", sal: 1, pse: 0 }
+                ]
+            },
+            "NB1": {
+                lat: 20.270168, lng: 105.980985, amox: null, oflo: null,
+                samples: [
+                    { t: "Nước", cfu: "2.852", sal: 3, pse: 51 },
+                    { t: "VN Nước", cfu: "36.975", sal: 9, pse: 2 },
+                    { t: "Bùn", cfu: "1.470.833", sal: 1, pse: 1 },
+                    { t: "VN Bùn", cfu: "122", sal: 5, pse: 0 },
+                    { t: "SOM", cfu: "17.767", sal: 1, pse: 0 }
+                ]
+            },
+            "NB2": {
+                lat: 20.254874, lng: 106.041030, amox: 0.76, oflo: 0.10,
+                samples: [
+                    { t: "Nước", cfu: "1.007", sal: 2, pse: 4 },
+                    { t: "VN Nước", cfu: "49.106", sal: 1, pse: 2 },
+                    { t: "Bùn", cfu: "1.184.444", sal: 5, pse: 0 },
+                    { t: "VN Bùn", cfu: "442.255", sal: 2, pse: 2 },
+                    { t: "SOM", cfu: "31.648", sal: 1, pse: 1 }
+                ]
+            },
+            "NB3": {
+                lat: 20.224119, lng: 106.100343, amox: 8.46, oflo: 0.41,
+                samples: [
+                    { t: "Nước", cfu: "2.183", sal: 3, pse: 11 },
+                    { t: "VN Nước", cfu: "37.468", sal: 0, pse: 2 },
+                    { t: "Bùn", cfu: "749.444", sal: 5, pse: 10 },
+                    { t: "VN Bùn", cfu: "623.500", sal: 0, pse: 0 },
+                    { t: "SOM", cfu: "16.455", sal: 0, pse: 0 }
+                ]
+            },
+            "NĐ1": {
+                lat: 20.274562, lng: 106.575639, amox: 7.16, oflo: 1.17,
+                samples: [
+                    { t: "Nước", cfu: "466", sal: 4, pse: 0 },
+                    { t: "VN Nước", cfu: "36.966", sal: 0, pse: 0 },
+                    { t: "Bùn", cfu: "208.333", sal: 0, pse: 0 },
+                    { t: "VN Bùn", cfu: "5.116", sal: 1, pse: 0 },
+                    { t: "SOM", cfu: "13.146", sal: 0, pse: 0 }
+                ]
+            },
+            "NĐ2": {
+                lat: 20.238269, lng: 106.586465, amox: 4.30, oflo: 1.91,
+                samples: [
+                    { t: "Nước", cfu: "6.133", sal: 1, pse: 2 },
+                    { t: "VN Nước", cfu: "44.101", sal: 0, pse: 0 },
+                    { t: "Bùn", cfu: "286.666", sal: 0, pse: 0 },
+                    { t: "VN Bùn", cfu: "13.050", sal: 0, pse: 0 }
+                ]
+            },
+            "AO1": {
+                lat: 19.952500, lng: 106.092778, amox: 4.25, oflo: 1.88,
+                samples: [
+                    { t: "Nước", cfu: "426", sal: 0, pse: 0 },
+                    { t: "VN Nước", cfu: "4.079", sal: 0, pse: 0 },
+                    { t: "Bùn", cfu: "303.333", sal: 0, pse: 0 },
+                    { t: "VN Bùn", cfu: "8.075", sal: 0, pse: 0 }
+                ]
+            },
+            "AO2": {
+                lat: 19.950556, lng: 106.093333, amox: 12.04, oflo: -1,
+                samples: [
+                    { t: "Nước", cfu: "114.500", sal: 0, pse: 0 },
+                    { t: "VN Nước", cfu: "5.243", sal: 0, pse: 0 },
+                    { t: "Bùn", cfu: "286.666", sal: 0, pse: 0 },
+                    { t: "VN Bùn", cfu: "6.645", sal: 0, pse: 0 }
+                ]
+            },
+            "HN1": {
+                lat: 21.002394, lng: 105.861617, amox: 11.23, oflo: 1.77,
+                samples: [
+                    { t: "Nước", cfu: "1.742.857", sal: 0, pse: 1 },
+                    { t: "VN Nước", cfu: "44.612", sal: 4, pse: 3 },
+                    { t: "Bùn", cfu: "1.491.111", sal: 0, pse: 0 },
+                    { t: "VN Bùn", cfu: "1.022.075", sal: 0, pse: 3 },
+                    { t: "SOM", cfu: "53.111", sal: 1, pse: 0 }
+                ]
+            },
+            "HN2": {
+                lat: 20.979782, lng: 105.864387, amox: 16.25, oflo: null,
+                samples: [
+                    { t: "Nước", cfu: "4.741.833", sal: 4, pse: 10 },
+                    { t: "VN Nước", cfu: "201.000", sal: 5, pse: 0 },
+                    { t: "Bùn", cfu: "2.165.833", sal: 0, pse: 0 },
+                    { t: "VN Bùn", cfu: "540.082", sal: 0, pse: 0 },
+                    { t: "SOM", cfu: "434.166", sal: 5, pse: 0 }
+                ]
+            },
+            "HN3": {
+                lat: 20.973038, lng: 105.852310, amox: 1.80, oflo: 0.63,
+                samples: [
+                    { t: "Nước", cfu: "1.567.000", sal: 0, pse: 2 },
+                    { t: "VN Nước", cfu: "16.177", sal: 0, pse: 0 },
+                    { t: "Bùn", cfu: "741.666", sal: 0, pse: 0 },
+                    { t: "VN Bùn", cfu: "521.250", sal: 1, pse: 0 },
+                    { t: "SOM", cfu: "156.416", sal: 0, pse: 0 }
+                ]
+            },
+            "HN4": {
+                lat: 21.136430, lng: 105.713542, amox: 1.69, oflo: 0.58,
+                samples: [
+                    { t: "Nước", cfu: "933.750", sal: 0, pse: 2 },
+                    { t: "VN Nước", cfu: "23.962", sal: 0, pse: 0 },
+                    { t: "Bùn", cfu: "1.069.166", sal: 0, pse: 0 },
+                    { t: "VN Bùn", cfu: "1.266.750", sal: 0, pse: 0 },
+                    { t: "SOM", cfu: "127.916", sal: 0, pse: 0 }
+                ]
+            },
+            "HN5": {
+                lat: 20.870492, lng: 105.828178, amox: 12.70, oflo: null,
+                samples: [
+                    { t: "Nước", cfu: "934.285", sal: 0, pse: 2 },
+                    { t: "VN Nước", cfu: "88.049", sal: 0, pse: 0 },
+                    { t: "Bùn", cfu: "1.115.833", sal: 0, pse: 0 },
+                    { t: "VN Bùn", cfu: "1.759.500", sal: 1, pse: 0 },
+                    { t: "SOM", cfu: "172.500", sal: 0, pse: 0 }
+                ]
+            },
+            "HN6": {
+                lat: 20.972705, lng: 105.781089, amox: 12.14, oflo: null,
+                samples: [
+                    { t: "Nước", cfu: "855.714", sal: 1, pse: 0 },
+                    { t: "VN Nước", cfu: "3.653", sal: 1, pse: 0 },
+                    { t: "Bùn", cfu: "2.900.000", sal: 0, pse: 0 },
+                    { t: "VN Bùn", cfu: "127.000", sal: 0, pse: 1 },
+                    { t: "SOM", cfu: "90.833", sal: 0, pse: 3 }
+                ]
+            }
+        };
+
+        // --- RENDER BẢN ĐỒ ---
+        var dashboardHeader = document.querySelector('.dash-header h3');
+        var dashboardCoords = document.querySelector('.dash-coords');
+        var dashboardContent = document.querySelector('.dash-content');
+
+        Object.keys(mapData).forEach(function(key) {
+            let d = mapData[key];
             
-            // --- HÀ NAM ---
-            { name: "HNA", lat: 20.545997, lng: 106.171562, amox: 20.12, oflo: null, status: "high" },
-
-            // --- NINH BÌNH ---
-            { name: "NB1", lat: 20.270168, lng: 105.980985, amox: null, oflo: null, status: "nodata" }, // Cả 2 đều #DIV/0!
-            { name: "NB2", lat: 20.254874, lng: 106.041030, amox: 0.76, oflo: 0.10, status: "safe" },
-            { name: "NB3", lat: 20.224119, lng: 106.100343, amox: 8.46, oflo: 0.41, status: "medium" },
-
-            // --- KHU VỰC AO (Ninh Bình/Thanh Hóa?) ---
-            { name: "AO1", lat: 19.952500, lng: 106.092778, amox: 4.25, oflo: 1.88, status: "medium" },
-            { name: "AO2", lat: 19.950556, lng: 106.093333, amox: 12.04, oflo: -1, status: "high" }, // N.D. -> -1 để đánh dấu
-
-            // --- NAM ĐỊNH ---
-            { name: "NĐ1", lat: 20.274562, lng: 106.575639, amox: 7.16, oflo: 1.17, status: "medium" },
-            { name: "NĐ2", lat: 20.238269, lng: 106.586465, amox: 4.30, oflo: 1.91, status: "medium" }
-        ];
-
-        // Hàm chọn màu chấm tròn
-        function getColor(status) {
-            return status === 'high' ? '#d32f2f' :       // Đỏ (Cao)
-                   status === 'medium' ? '#f57c00' :     // Cam (TB)
-                   status === 'nodata' ? '#999' :        // Xám (Không có số liệu)
-                   '#388e3c';                            // Xanh (Thấp/An toàn)
-        }
-
-        // Hàm format giá trị hiển thị
-        function formatVal(val) {
-            if (val === null) return '<span class="val-nodata">Chưa xác định</span>';
-            if (val === -1) return '<span class="val-safe">Không phát hiện</span>';
-            // Tô màu số liệu
-            let colorClass = (val > 10) ? 'val-high' : (val > 2) ? 'val-med' : 'val-safe';
-            return `<span class="${colorClass}">${val}</span> <span class="unit">ng/L</span>`;
-        }
-
-        // Vẽ điểm
-        samplingPoints.forEach(function(point) {
-            var marker = L.circleMarker([point.lat, point.lng], {
-                radius: 8,
-                fillColor: getColor(point.status),
-                color: "#fff",
-                weight: 1.5,
-                opacity: 1,
-                fillOpacity: 0.9
+            let marker = L.circleMarker([d.lat, d.lng], {
+                radius: 8, fillColor: "#d32f2f", color: "#fff", weight: 2, opacity: 1, fillOpacity: 0.8
             }).addTo(map);
 
-            // Tạo nội dung Popup
-            var popupContent = `
-                <div class="info-popup">
-                    <h3>Điểm thu mẫu: ${point.name}</h3>
-                    <div class="info-row">
-                        <span class="info-label">Amoxicillin:</span> ${formatVal(point.amox)}
+            // TẠO SỰ KIỆN HOVER -> CẬP NHẬT DASHBOARD
+            marker.on('mouseover', function (e) {
+                // Highlight marker
+                this.setStyle({radius: 12, color: '#ffea00', weight: 3});
+
+                // Cập nhật Header
+                dashboardHeader.innerHTML = `Điểm thu mẫu: ${key}`;
+                dashboardCoords.innerHTML = `Tọa độ: ${d.lat.toFixed(5)}, ${d.lng.toFixed(5)}`;
+
+                // Tạo nội dung bảng
+                let tableRows = "";
+                if(d.samples) {
+                    d.samples.forEach(s => {
+                        let w = getBarWidth(s.cfu);
+                        let pieStyle = getPieStyle(s.sal, s.pse);
+                        let strainInfo = (s.sal || 0) + (s.pse || 0);
+
+                        tableRows += `
+                            <tr>
+                                <td class="col-type">${s.t}</td>
+                                <td style="width:45%; padding-right:15px;">
+                                    <div class="bar-container">
+                                        <div class="bar-fill" style="width:${w}%"></div>
+                                    </div>
+                                    <div class="bar-label">${s.cfu}</div>
+                                </td>
+                                <td style="width:30%; text-align:center;">
+                                    <div class="pie-chart" style="${pieStyle}"></div>
+                                    <div class="pie-legend">${strainInfo > 0 ? (s.sal||0)+"/"+(s.pse||0) : "0"}</div>
+                                </td>
+                            </tr>
+                        `;
+                    });
+                }
+
+                // Cập nhật nội dung
+                dashboardContent.innerHTML = `
+                    <div class="section-title">Dư lượng Kháng sinh</div>
+                    <div class="antibiotic-grid">
+                        <div class="ab-box">
+                            <span class="ab-name">Amoxicillin</span>
+                            ${formatAb(d.amox)}
+                        </div>
+                        <div class="ab-box">
+                            <span class="ab-name">Ofloxacin</span>
+                            ${formatAb(d.oflo)}
+                        </div>
                     </div>
-                    <div class="info-row">
-                        <span class="info-label">Ofloxacin:</span> ${formatVal(point.oflo)}
+
+                    <div class="section-title">Chỉ tiêu Vi sinh</div>
+                    <table class="micro-table">
+                        <thead><tr><th>Loại</th><th>Mật độ (CFU)</th><th style="text-align:center">Chủng (S/P)</th></tr></thead>
+                        <tbody>${tableRows}</tbody>
+                    </table>
+
+                    <div class="legend-note">
+                        <span class="dot" style="background:#009688"></span>Mật độ (Log) &nbsp;
+                        <span class="dot" style="background:#ff9800"></span>Sal &nbsp;
+                        <span class="dot" style="background:#2196f3"></span>Pse
                     </div>
-                    <div class="coordinates">
-                        Lat: ${point.lat.toFixed(4)}, Lng: ${point.lng.toFixed(4)}
-                    </div>
-                </div>
-            `;
-            
-            marker.bindPopup(popupContent);
+                `;
+            });
+
+            // Khi chuột rời đi: KHÔNG XÓA bảng để người dùng có thể nhìn tiếp
+            marker.on('mouseout', function (e) {
+                this.setStyle({radius: 8, color: '#fff', weight: 2}); // Trả lại kích thước cũ
+            });
         });
-        
-        // Thêm chú thích (Legend) góc phải dưới
-        var legend = L.control({position: 'bottomright'});
-        legend.onAdd = function (map) {
-            var div = L.DomUtil.create('div', 'info legend');
-            div.style.background = "white";
-            div.style.padding = "10px";
-            div.style.border = "1px solid #ccc";
-            div.innerHTML = `
-                <div style="font-weight:bold; margin-bottom:5px">Mức độ tồn dư</div>
-                <div><span style="background:#d32f2f; width:10px; height:10px; display:inline-block; border-radius:50%"></span> Cao (>10 ng/L)</div>
-                <div><span style="background:#f57c00; width:10px; height:10px; display:inline-block; border-radius:50%"></span> Trung bình</div>
-                <div><span style="background:#388e3c; width:10px; height:10px; display:inline-block; border-radius:50%"></span> Thấp / An toàn</div>
-                <div><span style="background:#999; width:10px; height:10px; display:inline-block; border-radius:50%"></span> Không có số liệu</div>
-            `;
-            return div;
-        };
-        legend.addTo(map);
 
     </script>
 </body>
